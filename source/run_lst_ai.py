@@ -5,7 +5,7 @@ import datetime
 import subprocess
 from pathlib import Path
 import multiprocessing
-from utils import getSessionID, getSubjectID, split_list, getfileList
+from utils import getSessionID, getSubjectID, split_list, getfileList, availability_check
 
 def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
     """
@@ -55,6 +55,7 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
                 # get session ID of current T1w image
                 sesID = getSessionID(path = t1w[i])
 
+
                 # check availability of files and folders (create folders if necessary)
                 flair = str(t1w[i]).replace('_T1w.nii.gz', '_FLAIR.nii.gz')
                 if not os.path.exists(flair):
@@ -68,13 +69,15 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
                 if not os.path.exists(deriv_ses):
                     Path(deriv_ses).mkdir(parents=True, exist_ok=True)
                 
+
                 # skip to next case if segmentation already exist
                 seg_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_space-FLAIR_label-lesion_mask.nii.gz')
-                seg_file_annot = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_space-FLAIR_label-lesion_mask_desc-annotated.nii.gz')
+                seg_file_annot = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_space-FLAIR_desc-annotated_label-lesion_mask.nii.gz')
                 if os.path.exists(seg_file) and os.path.exists(seg_file_annot):
                     print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: LST-AI lesion segmentation already exists, skip and proceed to next case...')
                     continue
                 
+
                 # define command line for LST-AI
                 if remove_temp and use_cpu:
                     command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --device cpu'
@@ -88,12 +91,19 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
                 # run LST-AI
                 subprocess.run(command, shell=True)
 
+
                 # check if folder contains *seg-lst.nii.gz files, indicating that LST-AI successfully finished, and rename files
                 output_anat_files = os.listdir(deriv_ses)
-                if ('space-orig_seg-lst.nii.gz' in output_anat_files) and ('space-orig_desc-annotated_seg-lst.nii.gz' in output_anat_files):
+                les_vol_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_lesion_stats.csv')
+                les_vol_annot_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_annotated_lesion_stats.csv')
+
+                if ('space-flair_seg-lst.nii.gz' in output_anat_files) and ('space-flair_desc-annotated_seg-lst.nii.gz' in output_anat_files):
+                    
                     print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI lesion mask (BIDS)...')
-                    os.rename(os.path.join(deriv_ses,'space-orig_seg-lst.nii.gz'), seg_file)
-                    os.rename(os.path.join(deriv_ses,'space-orig_desc-annotated_seg-lst.nii.gz'), seg_file_annot)
+                    os.rename(os.path.join(deriv_ses,'space-flair_seg-lst.nii.gz'), seg_file)
+                    os.rename(os.path.join(deriv_ses,'space-flair_desc-annotated_seg-lst.nii.gz'), seg_file_annot)
+                    os.rename(os.path.join(deriv_ses,'lesion_stats.csv'), les_vol_file)
+                    os.rename(os.path.join(deriv_ses,'annotated_lesion_stats.csv'), les_vol_annot_file)
                     if os.path.exists(seg_file) and os.path.exists(seg_file_annot):
                         print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI lesion mask (BIDS) DONE!')
 
@@ -122,7 +132,7 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
             
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(description='Run SAMSEG cross sectional Pipeline on cohort.')
+    parser = argparse.ArgumentParser(description='Run LST-AI Pipeline on cohort.')
     parser.add_argument('-i', '--input_directory', help='Folder of derivatives in BIDS database.', required=True)
     parser.add_argument('-n', '--number_of_workers', help='Number of parallel processing cores.', type=int, default=os.cpu_count()-1)
     parser.add_argument('--cpu', help='Use the --cpu flag if you only want to use CPU.', action='store_true')
@@ -140,29 +150,42 @@ if __name__ == "__main__":
         remove_temp = True
     else:
         remove_temp = False
+    
+    input_path = args.input_directory
+    n_workers = args.number_of_workers
 
 
     # generate derivatives
-    derivatives_dir = os.path.join(args.input_directory, "derivatives/lst-ai_v1.0.0")
+    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.1.0b")
     if not os.path.exists(derivatives_dir):
         Path(derivatives_dir).mkdir(parents=True, exist_ok=True)
 
     
     # generate list with subject folders for multiprocessing
-    data_root = Path(os.path.join(args.input_directory))
+    data_root = Path(os.path.join(input_path))
     dirs = sorted(list(data_root.glob('*')))
     dirs = [str(x) for x in dirs]
     dirs = [x for x in dirs if "sub-" in x]
-    files = split_list(alist = dirs, 
-                       splits = args.number_of_workers)
+
+    # check which files have already been processed
+    dirs_missing, dirs_processed = availability_check(sub_dirs=dirs,
+                                                      deriv_dir=derivatives_dir,
+                                                      file_suffix='space-FLAIR_label-lesion_mask.nii.gz')
+    print(f'Number of incomplete subjects: {len(dirs_missing)}')
+    print(f'Number of complete subjects: {len(dirs_processed)}')
+
+    # only split the list of subjects with missing LST-AI lesion segmentation for multiprocessing
+    files = split_list(alist = dirs_missing, 
+                       splits = n_workers)
 
 
     # initialize multithreading
-    pool = multiprocessing.Pool(processes=args.number_of_workers)
+    pool = multiprocessing.Pool(processes=n_workers)
     # call samseg processing function in multiprocessing setting
-    for x in range(0, args.number_of_workers):
+    for x in range(0, n_workers):
         pool.apply_async(process_lst_ai, args=(files[x], derivatives_dir, remove_temp, use_cpu))
 
     pool.close()
     pool.join()
 
+    print('DONE!')
