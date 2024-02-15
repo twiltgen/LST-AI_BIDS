@@ -156,7 +156,7 @@ if __name__ == "__main__":
 
 
     # generate derivatives
-    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.1.0b")
+    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.1.0")
     if not os.path.exists(derivatives_dir):
         Path(derivatives_dir).mkdir(parents=True, exist_ok=True)
 
