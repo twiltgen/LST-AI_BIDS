@@ -16,12 +16,13 @@ parser.add_argument('-o', '--output_directory', help='Destination folder for the
 args = parser.parse_args()
 
 # define path of the derivatives folder
-derivatives_dir = os.path.join(args.input_directory, "derivatives/lst-ai_v1.0.0")
+derivatives_dir = os.path.join(args.input_directory, "derivatives/lst-ai-v1.1.0")
 
 # get a list with all subject folders in the database
 T1w_list = getfileList(path = args.input_directory, 
                        suffix = '*T1w*')
 T1w_list = [str(x) for x in T1w_list if (('.nii.gz' in str(x)) and 
+                                         (not 'derivatives' in str(x)) and
                                          (not 'GADOLINIUM' in str(x)))]
 
 # get a list with the paths of the _seg.mgz files 

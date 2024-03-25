@@ -45,7 +45,7 @@ def getSessionID(path):
     indices = [i for i, s in enumerate(stringList) if 'ses-' in s]
     text = stringList[indices[0]]
     try:
-        found = re.search(r'ses-(\d{8})', text).group(1)
+        found = re.search(r'ses-([a-zA-Z0-9]+)', text).group(1)
     except AttributeError:
         found = ''
     return found

@@ -48,7 +48,7 @@ parser.add_argument('-o', '--output_directory', help='Destination folder for the
 args = parser.parse_args()
 
 # define path of the derivatives folder
-derivatives_dir = os.path.join(args.input_directory, "derivatives/lst-ai-v1.1.0b")
+derivatives_dir = os.path.join(args.input_directory, "derivatives/lst-ai-v1.1.0")
 
 # get a list with the paths of the LST-AI lesion segmentation files 
 # (we do this because we only want subject- and session-IDs for the cases that have been successfully segmented by SAMSEG)
