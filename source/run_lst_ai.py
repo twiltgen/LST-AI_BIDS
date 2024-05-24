@@ -7,7 +7,7 @@ from pathlib import Path
 import multiprocessing
 from utils import getSessionID, getSubjectID, split_list, getfileList, availability_check
 
-def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
+def process_lst_ai(dirs, derivatives_dir, clipping, remove_temp=False, use_cpu=False):
     """
     This function applies LST-AI lesion segmentation and also applies required pre-processing steps of the T1w and FLAIR images. 
     Pre-processing includes skull-stripping and image registration. 
@@ -80,13 +80,13 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
 
                 # define command line for LST-AI
                 if remove_temp and use_cpu:
-                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --device cpu'
+                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --device cpu --clipping {clipping[0]} {clipping[1]}'
                 elif remove_temp:
-                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --device 0'
+                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --device 0 --clipping {clipping[0]} {clipping[1]}'
                 elif use_cpu:
-                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --temp {temp_dir} --device cpu'
+                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --temp {temp_dir} --device cpu --clipping {clipping[0]} {clipping[1]}'
                 else:
-                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --temp {temp_dir} --device 0'
+                    command = f'lst --t1 {t1w[i]} --flair {flair} --output {deriv_ses} --temp {temp_dir} --device 0 --clipping {clipping[0]} {clipping[1]}'
                 print(command)
                 # run LST-AI
                 subprocess.run(command, shell=True)
@@ -133,11 +133,31 @@ def process_lst_ai(dirs, derivatives_dir, remove_temp=False, use_cpu=False):
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description='Run LST-AI Pipeline on cohort.')
-    parser.add_argument('-i', '--input_directory', help='Folder of derivatives in BIDS database.', required=True)
-    parser.add_argument('-n', '--number_of_workers', help='Number of parallel processing cores.', type=int, default=os.cpu_count()-1)
-    parser.add_argument('--cpu', help='Use the --cpu flag if you only want to use CPU.', action='store_true')
-    parser.add_argument('--remove_temp', help='Use the --remove_temp flag if you want to remove the temp folder containing auxiliary files.', action='store_true')
 
+    parser.add_argument('-i', '--input_directory', 
+                        help='Folder of derivatives in BIDS database.', 
+                        required=True)
+
+    parser.add_argument('-n', '--number_of_workers', 
+                        help='Number of parallel processing cores.', 
+                        type=int, 
+                        default=os.cpu_count()-1)
+
+    parser.add_argument('--cpu', 
+                        help='Use the --cpu flag if you only want to use CPU.', 
+                        action='store_true')
+    
+    parser.add_argument('--remove_temp', 
+                        help='Use the --remove_temp flag if you want to remove the temp folder containing auxiliary files.', 
+                        action='store_true')
+
+    parser.add_argument('--clipping',
+                        dest='clipping',
+                        help='Clipping for standardization of image intensities (default: (min,max)=(0.5,99.5))',
+                        nargs='+',
+                        type=float,
+                        default=(0.5, 99.5))
+    
     # read the arguments
     args = parser.parse_args()
 
@@ -183,7 +203,7 @@ if __name__ == "__main__":
     pool = multiprocessing.Pool(processes=n_workers)
     # call samseg processing function in multiprocessing setting
     for x in range(0, n_workers):
-        pool.apply_async(process_lst_ai, args=(files[x], derivatives_dir, remove_temp, use_cpu))
+        pool.apply_async(process_lst_ai, args=(files[x], derivatives_dir, args.clipping, remove_temp, use_cpu))
 
     pool.close()
     pool.join()
