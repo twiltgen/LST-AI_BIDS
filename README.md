@@ -4,18 +4,15 @@ This repository contains a Python script for applying LST-AI lesion segmentation
 
 ## Table of Contents
 
-- [Installation](#installation)
+- [Requirements](#requirements)
 - [Usage](#usage)
 - [Arguments](#arguments)
 - [Pipeline Details](#pipeline-details)
 
 ## Installation
 
-To use this script, ensure you have Python installed on your system along with the required dependencies. You can install the necessary dependencies using the following command:
-
-```bash
-pip install -r requirements.txt
-```
+To use this pipeline, ensure you have Python installed on your system along with the required dependencies. 
+In addition, the pipeline requires LST-AI to be installed (https://github.com/CompImg/LST-AI).
 
 ## Usage
 
