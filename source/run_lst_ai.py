@@ -47,36 +47,36 @@ def process_lst_ai(dirs, derivatives_dir, clipping, lesion_thresh, remove_temp=F
         # get subject ID of current subject
         subID = getSubjectID(path = t1w[0])
 
-
         # iterate over all sessions with T1w images and check if FLAIR files are available and if lesion segmentation already exists
         for i in range(len(t1w)):
             try:
-
                 # get session ID of current T1w image
                 sesID = getSessionID(path = t1w[i])
-
+                sessionStub = f"sub-{subID}_ses-{sesID}" if sesID else f"sub-{subID}"
+                sessionStubPath = [f'sub-{subID}', f'ses-{sesID}'] if sesID else [f'sub-{subID}']
 
                 # check availability of files and folders (create folders if necessary)
                 flair = str(t1w[i]).replace('_T1w.nii.gz', '_FLAIR.nii.gz')
                 if not os.path.exists(flair):
-                    raise ValueError(f'sub-{subID}_ses-{sesID}: FLAIR image not available!!')
+                    raise ValueError(f'{sessionStub}: FLAIR image not available!!')
                 
-                temp_dir = os.path.join(derivatives_dir, f'sub-{subID}', f'ses-{sesID}', 'temp')
+                temp_dir = os.path.join(derivatives_dir, *sessionStubPath, 'temp')
+                deriv_ses = os.path.join(derivatives_dir, *sessionStubPath, 'anat')
+                seg_file = os.path.join(deriv_ses, f'{sessionStub}_space-FLAIR_label-lesion_mask.nii.gz')
+                seg_file_annot = os.path.join(deriv_ses, f'{sessionStub}_space-FLAIR_desc-annotated_label-lesion_mask.nii.gz')
+                les_vol_file = os.path.join(deriv_ses, f'{sessionStub}_lesion_stats.csv')
+                les_vol_annot_file = os.path.join(deriv_ses, f'{sessionStub}_annotated_lesion_stats.csv')
+
                 if not os.path.exists(temp_dir):
                     Path(temp_dir).mkdir(parents=True, exist_ok=True)
                 
-                deriv_ses = os.path.join(derivatives_dir, f'sub-{subID}', f'ses-{sesID}', 'anat')
                 if not os.path.exists(deriv_ses):
                     Path(deriv_ses).mkdir(parents=True, exist_ok=True)
-                
 
                 # skip to next case if segmentation already exist
-                seg_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_space-FLAIR_label-lesion_mask.nii.gz')
-                seg_file_annot = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_space-FLAIR_desc-annotated_label-lesion_mask.nii.gz')
                 if os.path.exists(seg_file) and os.path.exists(seg_file_annot):
-                    print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: LST-AI lesion segmentation already exists, skip and proceed to next case...')
+                    print(f'{datetime.datetime.now()} {sessionStub}: LST-AI lesion segmentation already exists, skip and proceed to next case...')
                     continue
-                
 
                 # define command line for LST-AI
                 if probmap:
@@ -104,41 +104,39 @@ def process_lst_ai(dirs, derivatives_dir, clipping, lesion_thresh, remove_temp=F
 
                 # check if folder contains *seg-lst.nii.gz files, indicating that LST-AI successfully finished, and rename files
                 output_anat_files = os.listdir(deriv_ses)
-                les_vol_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_lesion_stats.csv')
-                les_vol_annot_file = os.path.join(deriv_ses, f'sub-{subID}_ses-{sesID}_annotated_lesion_stats.csv')
 
                 if ('space-flair_seg-lst.nii.gz' in output_anat_files) and ('space-flair_desc-annotated_seg-lst.nii.gz' in output_anat_files):
                     
-                    print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI lesion mask (BIDS)...')
+                    print(f'{datetime.datetime.now()} {sessionStub}: Rename LST-AI lesion mask (BIDS)...')
                     os.rename(os.path.join(deriv_ses,'space-flair_seg-lst.nii.gz'), seg_file)
                     os.rename(os.path.join(deriv_ses,'space-flair_desc-annotated_seg-lst.nii.gz'), seg_file_annot)
                     os.rename(os.path.join(deriv_ses,'lesion_stats.csv'), les_vol_file)
                     os.rename(os.path.join(deriv_ses,'annotated_lesion_stats.csv'), les_vol_annot_file)
                     if os.path.exists(seg_file) and os.path.exists(seg_file_annot):
-                        print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI lesion mask (BIDS) DONE!')
+                        print(f'{datetime.datetime.now()} {sessionStub}: Rename LST-AI lesion mask (BIDS) DONE!')
 
                     # also rename auxiliary files if they are available
                     output_temp_files = os.listdir(temp_dir)
                     if (len(output_temp_files)>0):
-                        print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI auxiliary files (BIDS)...')
+                        print(f'{datetime.datetime.now()} {sessionStub}: Rename LST-AI auxiliary files (BIDS)...')
                         # iterate over all output files and rename to BIDS
                         for filename in output_temp_files:
                             if ('sub-X_ses-Y' in filename):
-                                os.rename(os.path.join(temp_dir, filename), os.path.join(temp_dir, str(filename).replace('sub-X_ses-Y', f'sub-{subID}_ses-{sesID}')))
+                                os.rename(os.path.join(temp_dir, filename), os.path.join(temp_dir, str(filename).replace('sub-X_ses-Y', f'{sessionStub}')))
                             else:
-                                os.rename(os.path.join(temp_dir, filename), os.path.join(temp_dir, f'sub-{subID}_ses-{sesID}_{filename}'))
-                        print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Rename LST-AI auxiliary files (BIDS) DONE!')
+                                os.rename(os.path.join(temp_dir, filename), os.path.join(temp_dir, f'{sessionStub}_{filename}'))
+                        print(f'{datetime.datetime.now()} {sessionStub}: Rename LST-AI auxiliary files (BIDS) DONE!')
                 else:
-                    print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: failed to generate segmentation, delete ouput folder...')
+                    print(f'{datetime.datetime.now()} {sessionStub}: failed to generate segmentation, delete ouput folder...')
                     shutil.rmtree(str(Path(deriv_ses).parent))
                     if os.path.exists(deriv_ses) or os.path.exists(temp_dir):
-                        raise ValueError(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: failed to delete the derivatives folder(s)!')
+                        raise ValueError(f'{datetime.datetime.now()} {sessionStub}: failed to delete the derivatives folder(s)!')
                     else:
-                        print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: successfully deleted the derivatives folder(s)!')
+                        print(f'{datetime.datetime.now()} {sessionStub}: successfully deleted the derivatives folder(s)!')
                         continue
 
             except:
-                print(f'{datetime.datetime.now()} sub-{subID}_ses-{sesID}: Error occured during processing, proceeding with next case.')
+                print(f'{datetime.datetime.now()} {sessionStub}: Error occured during processing, proceeding with next case.')
             
 if __name__ == "__main__":
 
@@ -203,7 +201,7 @@ if __name__ == "__main__":
 
 
     # generate derivatives
-    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.1.0")
+    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.2.0")
     if not os.path.exists(derivatives_dir):
         Path(derivatives_dir).mkdir(parents=True, exist_ok=True)
 
@@ -221,25 +219,37 @@ if __name__ == "__main__":
     print(f'Number of incomplete subjects: {len(dirs_missing)}')
     print(f'Number of complete subjects: {len(dirs_processed)}')
 
-    # only split the list of subjects with missing LST-AI lesion segmentation for multiprocessing
-    files = split_list(alist = dirs_missing, 
-                       splits = n_workers)
 
+    if n_workers == 1:
+        # Useful for debuging when pool hides errors
+        process_lst_ai(
+            dirs_missing,
+            derivatives_dir,
+            args.clipping,
+            args.lesion_threshold,
+            remove_temp,
+            args.probability_map,
+            use_cpu,
+            args.threads
+        )
+    else:
+        # only split the list of subjects with missing LST-AI lesion segmentation for multiprocessing
+        files = split_list(alist = dirs_missing,
+                        splits = n_workers)
+        # initialize multithreading
+        pool = multiprocessing.Pool(processes=n_workers)
+        # call samseg processing function in multiprocessing setting
+        for x in range(0, n_workers):
+            pool.apply_async(process_lst_ai, args=(files[x],
+                                                derivatives_dir,
+                                                args.clipping,
+                                                args.lesion_threshold,
+                                                remove_temp,
+                                                args.probability_map,
+                                                use_cpu,
+                                                args.threads))
 
-    # initialize multithreading
-    pool = multiprocessing.Pool(processes=n_workers)
-    # call samseg processing function in multiprocessing setting
-    for x in range(0, n_workers):
-        pool.apply_async(process_lst_ai, args=(files[x], 
-                                               derivatives_dir, 
-                                               args.clipping, 
-                                               args.lesion_threshold, 
-                                               remove_temp, 
-                                               args.probability_map, 
-                                               use_cpu, 
-                                               args.threads))
-
-    pool.close()
-    pool.join()
+        pool.close()
+        pool.join()
 
     print('DONE!')
