@@ -28,7 +28,8 @@ def getSubjectID(path):
     return found
 
 def getSessionID(path):
-    """This function extracts the seesion ID from the file path (BIDS format)
+    """
+    This function extracts the seesion ID from the file path (BIDS format)
 
     Parameters:
     -----------

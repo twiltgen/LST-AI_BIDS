@@ -201,7 +201,7 @@ if __name__ == "__main__":
 
 
     # generate derivatives
-    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.2.0")
+    derivatives_dir = os.path.join(input_path, "derivatives/lst-ai-v1.1.0")
     if not os.path.exists(derivatives_dir):
         Path(derivatives_dir).mkdir(parents=True, exist_ok=True)
 
@@ -238,7 +238,7 @@ if __name__ == "__main__":
                         splits = n_workers)
         # initialize multithreading
         pool = multiprocessing.Pool(processes=n_workers)
-        # call samseg processing function in multiprocessing setting
+        # call LST-AI processing function in multiprocessing setting
         for x in range(0, n_workers):
             pool.apply_async(process_lst_ai, args=(files[x],
                                                 derivatives_dir,
